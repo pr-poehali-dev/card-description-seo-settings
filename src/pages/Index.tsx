@@ -21,33 +21,88 @@ function transliterate(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function generateNames(input: string): string[] {
-  const slug = transliterate(input.trim());
-  if (!slug) return [];
-  return Array.from({ length: 5 }, (_, i) => `foto-${slug}-sibtomat54ru-ru-${i + 1}.jpg`);
+interface PhotoRow {
+  num: number;
+  emoji: string;
+  theme: string;
+  filename: (slug: string, name: string) => string;
+  description: (name: string) => string;
 }
+
+const PHOTOS: PhotoRow[] = [
+  {
+    num: 1,
+    emoji: '🛒',
+    theme: 'Купить семена',
+    filename: (slug) => `foto-${slug}-sibtomat54ru-ru-1.jpg`,
+    description: (name) => `Купить семена ${name} от СибТомат54.ру`,
+  },
+  {
+    num: 2,
+    emoji: '🔪',
+    theme: 'Разрез томата',
+    filename: (slug) => `foto-${slug}-sibtomat54ru-ru-2.jpg`,
+    description: (name) => `Разрез томата ${name} на sibtomat54.ru`,
+  },
+  {
+    num: 3,
+    emoji: '🌿',
+    theme: 'На кусту',
+    filename: (slug) => `foto-${slug}-sibtomat54ru-ru-3.jpg`,
+    description: (name) => `Томат ${name} на кусту — sibtomat54.ru`,
+  },
+  {
+    num: 4,
+    emoji: '🏡',
+    theme: 'В теплице',
+    filename: (slug) => `foto-${slug}-sibtomat54ru-ru-4.jpg`,
+    description: (name) => `${name} в теплице — семена на sibtomat54.ru`,
+  },
+  {
+    num: 5,
+    emoji: '📦',
+    theme: 'Семена крупно',
+    filename: (slug) => `foto-${slug}-sibtomat54ru-ru-5.jpg`,
+    description: (name) => `Семена томата ${name} купить — СибТомат54.ру`,
+  },
+];
+
+type CopyState = { row: number; col: 'file' | 'desc' } | null;
 
 const Index = () => {
   const [input, setInput] = useState('');
-  const [copied, setCopied] = useState<number | null>(null);
-  const [allCopied, setAllCopied] = useState(false);
+  const [copied, setCopied] = useState<CopyState>(null);
+  const [allCopied, setAllCopied] = useState<'files' | 'descs' | null>(null);
 
-  const names = generateNames(input);
+  const name = input.trim();
+  const slug = transliterate(name);
+  const hasData = slug.length > 0;
 
-  const copyOne = async (text: string, idx: number) => {
+  const copyText = async (text: string, row: number, col: 'file' | 'desc') => {
     await navigator.clipboard.writeText(text);
-    setCopied(idx);
+    setCopied({ row, col });
     setTimeout(() => setCopied(null), 1800);
   };
 
-  const copyAll = async () => {
-    await navigator.clipboard.writeText(names.join('\n'));
-    setAllCopied(true);
-    setTimeout(() => setAllCopied(false), 1800);
+  const copyAllFiles = async () => {
+    const text = PHOTOS.map(p => p.filename(slug, name)).join('\n');
+    await navigator.clipboard.writeText(text);
+    setAllCopied('files');
+    setTimeout(() => setAllCopied(null), 1800);
   };
 
+  const copyAllDescs = async () => {
+    const text = PHOTOS.map(p => p.description(name)).join('\n');
+    await navigator.clipboard.writeText(text);
+    setAllCopied('descs');
+    setTimeout(() => setAllCopied(null), 1800);
+  };
+
+  const isCopied = (row: number, col: 'file' | 'desc') =>
+    copied?.row === row && copied?.col === col;
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--parchment)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '3rem 1.5rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--parchment)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3rem 1.5rem 4rem' }}>
 
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
@@ -58,15 +113,15 @@ const Index = () => {
           </span>
         </div>
         <h1 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '2rem', fontWeight: 700, color: 'var(--soil-dark)', marginBottom: '0.4rem' }}>
-          Генератор имён файлов
+          Генератор подписей для фото
         </h1>
-        <p style={{ fontSize: '0.9rem', color: 'var(--soil-mid)', maxWidth: 400 }}>
-          Введи название сорта — получи 5 готовых имён для фото
+        <p style={{ fontSize: '0.9rem', color: 'var(--soil-mid)' }}>
+          Введи название сорта — получи имена файлов и описания для 5 фото
         </p>
       </div>
 
-      {/* Input card */}
-      <div className="card-warm animate-fade-in" style={{ width: '100%', maxWidth: 560, padding: '2rem', marginBottom: '1.5rem' }}>
+      {/* Input */}
+      <div className="card-warm animate-fade-in" style={{ width: '100%', maxWidth: 780, padding: '1.75rem 2rem', marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ochre)', marginBottom: '0.6rem' }}>
           Название сорта
         </label>
@@ -74,18 +129,12 @@ const Index = () => {
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Чарли Чаплин (Charlie Chaplin)"
+            placeholder="Чарли Чаплин (Charlie Chaplin, США)"
             style={{
-              flex: 1,
-              padding: '0.75rem 1rem',
-              borderRadius: 8,
-              border: '1.5px solid var(--straw)',
-              background: '#fffdf8',
-              fontFamily: 'Golos Text, sans-serif',
-              fontSize: '1rem',
-              color: 'var(--soil-dark)',
-              outline: 'none',
-              transition: 'border-color 0.2s',
+              flex: 1, padding: '0.75rem 1rem', borderRadius: 8,
+              border: '1.5px solid var(--straw)', background: '#fffdf8',
+              fontFamily: 'Golos Text, sans-serif', fontSize: '1rem',
+              color: 'var(--soil-dark)', outline: 'none', transition: 'border-color 0.2s',
             }}
             onFocus={e => (e.target.style.borderColor = 'var(--terracotta)')}
             onBlur={e => (e.target.style.borderColor = 'var(--straw)')}
@@ -94,120 +143,128 @@ const Index = () => {
           {input && (
             <button
               onClick={() => setInput('')}
-              style={{
-                padding: '0.75rem',
-                borderRadius: 8,
-                border: '1.5px solid var(--straw)',
-                background: '#fffdf8',
-                cursor: 'pointer',
-                color: 'var(--ochre)',
-                transition: 'all 0.2s',
-              }}
-              title="Очистить"
+              style={{ padding: '0.75rem', borderRadius: 8, border: '1.5px solid var(--straw)', background: '#fffdf8', cursor: 'pointer', color: 'var(--ochre)' }}
             >
               <Icon name="X" size={16} />
             </button>
           )}
         </div>
-
-        {/* Preview slug */}
-        {names.length > 0 && (
-          <div style={{ marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--soil-mid)' }}>
-            Слаг: <code style={{ background: 'var(--straw)', padding: '0.15rem 0.4rem', borderRadius: 4, fontFamily: 'monospace', color: 'var(--soil-dark)' }}>
-              {transliterate(input.trim())}
-            </code>
+        {hasData && (
+          <div style={{ marginTop: '0.6rem', fontSize: '0.78rem', color: 'var(--soil-mid)' }}>
+            Слаг: <code style={{ background: 'var(--straw)', padding: '0.15rem 0.4rem', borderRadius: 4, fontFamily: 'monospace', color: 'var(--soil-dark)' }}>{slug}</code>
           </div>
         )}
       </div>
 
-      {/* Results */}
-      {names.length > 0 && (
-        <div className="card-warm animate-fade-in" style={{ width: '100%', maxWidth: 560, padding: '1.5rem' }}>
+      {/* Table */}
+      {hasData && (
+        <div className="card-warm animate-fade-in" style={{ width: '100%', maxWidth: 780, padding: '1.5rem' }}>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <span className="section-label">Имена файлов</span>
-            <button
-              onClick={copyAll}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.35rem',
-                padding: '0.4rem 0.9rem',
-                borderRadius: 7,
-                border: allCopied ? '1.5px solid var(--green-leaf)' : '1.5px solid var(--terracotta)',
-                background: allCopied ? 'rgba(74,124,89,0.1)' : 'transparent',
-                color: allCopied ? 'var(--green-leaf)' : 'var(--terracotta)',
-                fontSize: '0.8rem', fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'Golos Text, sans-serif',
-                transition: 'all 0.25s',
-              }}
-            >
-              <Icon name={allCopied ? 'CheckCheck' : 'Copy'} size={14} />
-              {allCopied ? 'Скопированы все' : 'Копировать все'}
-            </button>
+          {/* Column headers + copy-all buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2rem 7rem 1fr 1fr', gap: '0.75rem', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--straw)' }}>
+            <div />
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ochre)' }}>Тема</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ochre)' }}>Имя файла</span>
+              <button onClick={copyAllFiles} style={copyAllBtnStyle(allCopied === 'files')}>
+                <Icon name={allCopied === 'files' ? 'CheckCheck' : 'Copy'} size={12} />
+                {allCopied === 'files' ? 'Скопированы' : 'Все'}
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ochre)' }}>Описание (alt)</span>
+              <button onClick={copyAllDescs} style={copyAllBtnStyle(allCopied === 'descs')}>
+                <Icon name={allCopied === 'descs' ? 'CheckCheck' : 'Copy'} size={12} />
+                {allCopied === 'descs' ? 'Скопированы' : 'Все'}
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {names.map((name, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.75rem',
-                  padding: '0.7rem 0.9rem',
-                  borderRadius: 8,
-                  background: copied === i ? 'rgba(74,124,89,0.08)' : '#fffdf8',
-                  border: copied === i ? '1.5px solid var(--green-leaf)' : '1.5px solid var(--straw)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <span style={{
-                  minWidth: 22, height: 22, borderRadius: 6,
-                  background: 'var(--straw)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.7rem', fontWeight: 700, color: 'var(--soil-mid)', flexShrink: 0,
+            {PHOTOS.map((p) => {
+              const filename = p.filename(slug, name);
+              const desc = p.description(name);
+              return (
+                <div key={p.num} style={{
+                  display: 'grid', gridTemplateColumns: '2rem 7rem 1fr 1fr',
+                  gap: '0.75rem', alignItems: 'center',
+                  padding: '0.65rem 0.5rem', borderRadius: 8,
+                  background: '#fffdf8', border: '1px solid var(--straw)',
+                  transition: 'all 0.15s',
                 }}>
-                  {i + 1}
-                </span>
-                <code style={{
-                  flex: 1, fontSize: '0.85rem',
-                  fontFamily: 'monospace',
-                  color: 'var(--soil-dark)',
-                  wordBreak: 'break-all',
-                  lineHeight: 1.4,
-                }}>
-                  {name}
-                </code>
-                <button
-                  onClick={() => copyOne(name, i)}
-                  style={{
-                    flexShrink: 0,
-                    padding: '0.35rem 0.7rem',
-                    borderRadius: 6,
-                    border: 'none',
-                    background: copied === i ? 'var(--green-leaf)' : 'var(--terracotta)',
-                    color: 'var(--parchment)',
-                    fontSize: '0.75rem', fontWeight: 600,
-                    cursor: 'pointer', fontFamily: 'Golos Text, sans-serif',
-                    display: 'flex', alignItems: 'center', gap: '0.3rem',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <Icon name={copied === i ? 'Check' : 'Copy'} size={13} />
-                  {copied === i ? 'OK' : 'Копировать'}
-                </button>
-              </div>
-            ))}
+                  {/* № */}
+                  <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--straw)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--soil-mid)', flexShrink: 0 }}>
+                    {p.num}
+                  </div>
+
+                  {/* Тема */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <span style={{ fontSize: '1rem' }}>{p.emoji}</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--soil-mid)', fontWeight: 500, lineHeight: 1.3 }}>{p.theme}</span>
+                  </div>
+
+                  {/* Имя файла */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <code style={{ flex: 1, fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--soil-dark)', wordBreak: 'break-all', lineHeight: 1.4, background: isCopied(p.num, 'file') ? 'rgba(74,124,89,0.08)' : 'transparent', borderRadius: 4, padding: '0.1rem 0.2rem', transition: 'background 0.2s' }}>
+                      {filename}
+                    </code>
+                    <button onClick={() => copyText(filename, p.num, 'file')} style={copyBtnStyle(isCopied(p.num, 'file'))}>
+                      <Icon name={isCopied(p.num, 'file') ? 'Check' : 'Copy'} size={12} />
+                    </button>
+                  </div>
+
+                  {/* Описание */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ flex: 1, fontSize: '0.8rem', color: 'var(--soil-dark)', lineHeight: 1.4, background: isCopied(p.num, 'desc') ? 'rgba(74,124,89,0.08)' : 'transparent', borderRadius: 4, padding: '0.1rem 0.2rem', transition: 'background 0.2s' }}>
+                      {desc}
+                    </span>
+                    <button onClick={() => copyText(desc, p.num, 'desc')} style={copyBtnStyle(isCopied(p.num, 'desc'))}>
+                      <Icon name={isCopied(p.num, 'desc') ? 'Check' : 'Copy'} size={12} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Empty state */}
-      {!input && (
-        <div style={{ textAlign: 'center', color: 'var(--straw)', marginTop: '1rem' }}>
+      {!hasData && (
+        <div style={{ textAlign: 'center', marginTop: '2rem' }}>
           <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>📂</div>
           <div style={{ fontSize: '0.85rem', color: 'var(--ochre)' }}>Введи название сорта выше</div>
         </div>
       )}
-
     </div>
   );
 };
+
+function copyBtnStyle(active: boolean): React.CSSProperties {
+  return {
+    flexShrink: 0,
+    width: 28, height: 28,
+    borderRadius: 6, border: 'none',
+    background: active ? 'var(--green-leaf)' : 'var(--terracotta)',
+    color: 'var(--parchment)',
+    cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'all 0.2s',
+  };
+}
+
+function copyAllBtnStyle(active: boolean): React.CSSProperties {
+  return {
+    display: 'flex', alignItems: 'center', gap: '0.25rem',
+    padding: '0.25rem 0.6rem',
+    borderRadius: 6,
+    border: active ? '1.5px solid var(--green-leaf)' : '1.5px solid var(--terracotta)',
+    background: active ? 'rgba(74,124,89,0.1)' : 'transparent',
+    color: active ? 'var(--green-leaf)' : 'var(--terracotta)',
+    fontSize: '0.72rem', fontWeight: 600,
+    cursor: 'pointer', fontFamily: 'Golos Text, sans-serif',
+    transition: 'all 0.25s',
+  };
+}
 
 export default Index;
